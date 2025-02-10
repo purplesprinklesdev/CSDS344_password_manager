@@ -71,7 +71,38 @@ public class App {
         
         // PASSWORD MANAGER UNLOCKED
 
+        Boolean running = true;
 
+        while (running) {
+            System.out.println("\na: Add Password\nb: Read Password\nq: Quit\nEnter choice: ");
+            String choice = cin.nextLine();
+
+            if (choice.equals("q")) {
+                running = false;
+            } else if (choice.equals("a")) {
+
+                System.out.println("Enter label for password: ");
+                String label = cin.nextLine();
+                System.out.println("\nEnter password to store: ");
+                passcodeString = cin.nextLine();
+                keyFileScan.useDelimiter("\n");
+
+                SecureRandom random = new SecureRandom();
+                byte[] salt = new byte[16];
+                random.nextBytes(salt);
+
+                saltString = Base64.getEncoder().encodeToString(salt);
+
+                String hashString = getPrivateKeyHashed(passcodeString, saltString);
+                String outputString = label + "\n" + saltString + ":" + hashString + "\n";
+
+                if (keyFileScan.findAll(label).count() == 0) {
+                    writeToFile(keyFile, outputString, true);
+                } else {
+                    // Replace File
+                }
+            }
+        }
 
         //TODO: adding passwords
 
