@@ -89,6 +89,7 @@ public class App {
                 cin.close();
                 System.exit(1);
             }
+            keyFileScan.nextLine();
 
             System.out.println("\nWelcome to Password Manager");
             System.out.print("\na: Add Password\nb: Read Password\nq: Quit\nEnter choice: ");
@@ -104,34 +105,45 @@ public class App {
                     String label = cin.nextLine();
                     System.out.print("Enter password to store: ");
                     String storedPassword = cin.nextLine();
-                    keyFileScan.useDelimiter("\n");
-
+                    
                     String encryptedPasscodeString = encryptMessage(storedPassword, passcodeString, saltString);
                     String outputString = label + ":" + encryptedPasscodeString + "\n";
 
-                    if (keyFileScan.findAll(label).count() == 0) {
-                        writeToFile(keyFile, outputString, true);
-                    } else {
-                        replacePassword(label, encryptedPasscodeString, keyFile);
+                    // With this label searching method the input label must match another label exactly, 
+                    // rather than triggering a replace when it is contained within an existing label
+                    boolean existing = false;
+                    keyFileScan.useDelimiter(":");
+                    while (!existing && keyFileScan.hasNextLine()) {
+                        existing = keyFileScan.next().equals(label);
+
+                        keyFileScan.nextLine();
                     }
+
+                    if (existing)
+                        replacePassword(label, encryptedPasscodeString, keyFile);
+                    else
+                        writeToFile(keyFile, outputString, true);
+
                     break;
                 }
                 case "b": {
-                    keyFileScan.useDelimiter("\n");
                     System.out.print("Enter label for password: ");
                     String label = cin.nextLine();
-                    String[] labelPassPair = new String[1];
 
-                    boolean found = false;
-                    while (!found && keyFileScan.hasNext()) {
-                        labelPassPair = keyFileScan.nextLine().split(":");
-                        if (labelPassPair[0].equals(label)) {
-                            found=true;
-                        }
+                    String targetPassword = "";
+                    
+                    boolean existing = false;
+                    keyFileScan.useDelimiter(":");
+                    while (!existing && keyFileScan.hasNextLine()) {
+                        existing = keyFileScan.next().equals(label);
+
+                        targetPassword = keyFileScan.nextLine();
                     }
 
-                    if (found)
-                        System.out.println("The stored password is: " + decryptMessage(labelPassPair[1], passcodeString, saltString));
+                    targetPassword = targetPassword.substring(1); // Remove illegal character ":"
+
+                    if (existing)
+                        System.out.println("The stored password is: " + decryptMessage(targetPassword, passcodeString, saltString));
                     else
                         System.out.println("No password matches label \"" + label + "\"");
 
