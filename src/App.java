@@ -1,8 +1,12 @@
+import java.util.Arrays;
 import java.util.Scanner;
 
+import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -27,11 +31,7 @@ public class App {
             System.out.print("No keyfile detected. Running as new user.\nCreate a passcode that you will use to access your new password manager.\nCreate passcode: ");
             String newPasscodeString = cin.nextLine();
 
-            SecureRandom random = new SecureRandom();
-            byte[] salt = new byte[16];
-            random.nextBytes(salt);
-
-            String saltString = Base64.getEncoder().encodeToString(salt);
+            String saltString = generateRandomSaltString();
 
             String hashString = getPrivateKeyHashed(newPasscodeString, saltString);
             String outputString = saltString + ":" + hashString + "\n";
@@ -63,7 +63,11 @@ public class App {
         System.out.print("Enter your passcode to access Password Manager: ");
         String passcodeString = cin.nextLine();
 
-        while (getPrivateKeyHashed(passcodeString, saltString).equals(storedPrivateKeyHash)) {
+        if (storedPrivateKeyHash.charAt(0) == ':') {
+            storedPrivateKeyHash = storedPrivateKeyHash.substring(1);
+        }
+
+        while (!getPrivateKeyHashed(passcodeString, saltString).equals(storedPrivateKeyHash)) {
             System.out.println("Incorrect Passcode");
             System.out.print("Enter your passcode to access Password Manager: ");
             passcodeString = cin.nextLine();
@@ -71,48 +75,132 @@ public class App {
         
         // PASSWORD MANAGER UNLOCKED
 
-        Boolean running = true;
+        boolean running = true;
 
         while (running) {
-            System.out.println("\na: Add Password\nb: Read Password\nq: Quit\nEnter choice: ");
+            keyFileScan.close();
+            try {
+                keyFileScan = new Scanner(keyFile);
+                keyFileScan.nextLine();
+            } catch (FileNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+
+            System.out.print("\na: Add Password\nb: Read Password\nq: Quit\nEnter choice: ");
             String choice = cin.nextLine();
 
-            if (choice.equals("q")) {
-                running = false;
-            } else if (choice.equals("a")) {
+            switch (choice) {
+                case "q" -> {
+                    running = false;
+                }
+                case "a" -> {
 
-                System.out.println("Enter label for password: ");
-                String label = cin.nextLine();
-                System.out.println("\nEnter password to store: ");
-                passcodeString = cin.nextLine();
-                keyFileScan.useDelimiter("\n");
+                    System.out.print("Enter label for password: ");
+                    String label = cin.nextLine();
+                    System.out.print("Enter password to store: ");
+                    String storedPassword = cin.nextLine();
+                    keyFileScan.useDelimiter("\n");
 
-                SecureRandom random = new SecureRandom();
-                byte[] salt = new byte[16];
-                random.nextBytes(salt);
+                    String encryptedPasscodeString = encryptMessage(storedPassword, passcodeString, saltString);
+                    String outputString = label + ":" + encryptedPasscodeString + "\n";
 
-                saltString = Base64.getEncoder().encodeToString(salt);
+                    if (keyFileScan.findAll(label).count() == 0) {
+                        writeToFile(keyFile, outputString, true);
+                    } else {
+                        // TODO: Replace Functionality for Passwords
+                    }
+                }
+                case "b" -> {
+                    keyFileScan.useDelimiter("\n");
+                    System.out.print("Enter label for password: ");
+                    String label = cin.nextLine();
+                    String[] labelPassPair = new String[1];
 
-                String hashString = getPrivateKeyHashed(passcodeString, saltString);
-                String outputString = label + "\n" + saltString + ":" + hashString + "\n";
+                    boolean found = false;
+                    while (!found && keyFileScan.hasNext()) {
+                        labelPassPair = keyFileScan.nextLine().split(":");
+                        if (labelPassPair[0].equals(label)) {
+                            found=true;
+                        }
+                    }
 
-                if (keyFileScan.findAll(label).count() == 0) {
-                    writeToFile(keyFile, outputString, true);
-                } else {
-                    // Replace File
+                    if (found)
+                        System.out.println("The stored password is: " + decryptMessage(labelPassPair[1], passcodeString, saltString));
+                    else
+                        System.out.println("No password matches this label!");
                 }
             }
         }
 
-        //TODO: adding passwords
-
-
-        //TODO: reading passwords
-
-
         keyFileScan.close();
         cin.close();
     }
+
+    private static String generateRandomSaltString() {
+        SecureRandom random = new SecureRandom();
+        byte[] salt = new byte[16];
+        random.nextBytes(salt);
+
+        return Base64.getEncoder().encodeToString(salt);
+    }
+
+    private static String decryptMessage(String message, String passcode, String saltString) {
+        try {
+            byte[] salt = Base64.getDecoder().decode(saltString);
+            byte[] encryptedData = Base64.getDecoder().decode(message);
+
+            // Apparently we need to handle these (IVs) otherwise decryption with PBKDF2 doesn't work properly
+            byte[] iv = Arrays.copyOfRange(encryptedData, 0, 16);
+            byte[] actualCiphertext = Arrays.copyOfRange(encryptedData, 16, encryptedData.length);
+
+            KeySpec spec = new PBEKeySpec(passcode.toCharArray(), salt, PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH);
+            SecretKeyFactory factory = SecretKeyFactory.getInstance(KEY_GEN_ALGORITHM);
+            SecretKey privateKey = factory.generateSecret(spec);
+            SecretKeySpec keySpec = new SecretKeySpec(privateKey.getEncoded(), "AES");
+
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, keySpec, new IvParameterSpec(iv));
+
+            byte[] decryptedData = cipher.doFinal(actualCiphertext);
+            return new String(decryptedData);
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(1);
+            return null;
+        }
+    }
+
+
+    private static String encryptMessage(String message, String passcode, String saltString) {
+        try {
+            byte[] salt = Base64.getDecoder().decode(saltString);
+            byte[] iv = new byte[16];
+            SecureRandom random = new SecureRandom();
+            random.nextBytes(iv);
+
+            KeySpec spec = new PBEKeySpec(passcode.toCharArray(), salt, PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH);
+            SecretKeyFactory factory = SecretKeyFactory.getInstance(KEY_GEN_ALGORITHM);
+            SecretKey privateKey = factory.generateSecret(spec);
+            SecretKeySpec keySpec = new SecretKeySpec(privateKey.getEncoded(), "AES");
+
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(iv));
+
+            byte[] encryptedData = cipher.doFinal(message.getBytes());
+
+            byte[] ivCipherCombined = new byte[iv.length + encryptedData.length];
+            System.arraycopy(iv, 0, ivCipherCombined, 0, iv.length);
+            System.arraycopy(encryptedData, 0, ivCipherCombined, iv.length, encryptedData.length);
+
+            return Base64.getEncoder().encodeToString(ivCipherCombined);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(1);
+            return null;
+        }
+    }
+
 
     private static String getPrivateKeyHashed(String passcode, String saltString) {
     
@@ -132,6 +220,7 @@ public class App {
             System.exit(1);
             return null;
         }
+
 
         byte[] hash = privateKey.getEncoded();
         String hashString = Base64.getEncoder().encodeToString(hash);
