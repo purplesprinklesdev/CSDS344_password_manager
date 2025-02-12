@@ -103,14 +103,8 @@ public class App {
                 case "a": {
                     System.out.print("Enter label for password: ");
                     String label = cin.nextLine();
-                    System.out.print("Enter password to store: ");
-                    String storedPassword = cin.nextLine();
-                    
-                    String encryptedPasscodeString = encryptMessage(storedPassword, passcodeString, saltString);
-                    String outputString = label + ":" + encryptedPasscodeString + "\n";
 
-                    // With this label searching method the input label must match another label exactly, 
-                    // rather than triggering a replace when it is contained within an existing label
+                    // Search for this label in the keyfile
                     boolean existing = false;
                     keyFileScan.useDelimiter(":");
                     while (!existing && keyFileScan.hasNextLine()) {
@@ -118,6 +112,24 @@ public class App {
 
                         keyFileScan.nextLine();
                     }
+
+                    // Prompt user to overwrite
+                    String overwriteChoice = "";
+                    if (existing) {
+                        System.out.println("A Password with this label already exists, would you like to overwrite?");
+                        System.out.println("\ny: Overwrite\nn: Go Back\nEnter choice: ");
+                    
+                        overwriteChoice = cin.nextLine();
+
+                        if (!overwriteChoice.equals("y"))
+                            continue;
+                    }
+
+                    System.out.print("Enter password to store: ");
+                    String storedPassword = cin.nextLine();
+                    
+                    String encryptedPasscodeString = encryptMessage(storedPassword, passcodeString, saltString);
+                    String outputString = label + ":" + encryptedPasscodeString + "\n";
 
                     if (existing)
                         replacePassword(label, encryptedPasscodeString, keyFile);
