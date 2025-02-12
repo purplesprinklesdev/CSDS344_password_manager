@@ -56,7 +56,7 @@ public class App {
             return;
         }
 
-        System.out.print("Keyfile detected.");
+        System.out.println("Keyfile detected.");
 
         //  AUTHENTICATION
 
@@ -119,7 +119,7 @@ public class App {
                     String overwriteChoice = "";
                     if (existing) {
                         System.out.println("A Password with this label already exists, would you like to overwrite?");
-                        System.out.println("\ny: Overwrite\nn: Go Back\nEnter choice: ");
+                        System.out.print("\ny: Overwrite\nn: Go Back\nEnter choice: ");
                     
                         overwriteChoice = cin.nextLine();
 
