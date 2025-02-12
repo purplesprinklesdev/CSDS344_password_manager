@@ -15,11 +15,13 @@ import java.security.SecureRandom;
 import java.security.spec.KeySpec;
 import java.util.Base64;
 
+// TODO: Comments, Docstring and Authors
+// TODO: Prompt user if the want to replace a password or not
 
 public class App {
-    private static String KEY_GEN_ALGORITHM = "PBKDF2WithHmacSHA256";
-    private static int PBKDF2_ITERATIONS = 1024;
-    private static int PBKDF2_KEY_LENGTH = 128;
+    private static final String KEY_GEN_ALGORITHM = "PBKDF2WithHmacSHA256";
+    private static final int PBKDF2_ITERATIONS = 1024;
+    private static final int PBKDF2_KEY_LENGTH = 128;
 
     public static void main(String[] args) {
         Scanner cin = new Scanner(System.in);
@@ -107,7 +109,7 @@ public class App {
                     if (keyFileScan.findAll(label).count() == 0) {
                         writeToFile(keyFile, outputString, true);
                     } else {
-                        // TODO: Replace Functionality for Passwords
+                        replacePassword(label, encryptedPasscodeString, keyFile);
                     }
                 }
                 case "b" -> {
@@ -168,6 +170,32 @@ public class App {
             System.exit(1);
             return null;
         }
+    }
+
+    private static void replacePassword(String label, String password, File file) {
+        String[] labelPassPair = new String[1];
+        Scanner keyFileScan = null;
+        try {
+            keyFileScan = new Scanner(file);
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+
+        StringBuilder builder = new StringBuilder();
+
+        boolean found = false;
+        while (!found && keyFileScan.hasNext()) {
+            String line = keyFileScan.nextLine();
+            labelPassPair = line.split(":");
+            if (labelPassPair[0].equals(label)) {
+                builder.append(label).append(":").append(password).append("\n");
+            } else
+                builder.append(line).append("\n");
+        }
+
+        keyFileScan.close();
+
+        writeToFile(file, builder.toString(), false);
     }
 
 
