@@ -15,9 +15,9 @@ import java.security.SecureRandom;
 import java.security.spec.KeySpec;
 import java.util.Base64;
 
-// TODO: Comments, Docstring and Authors
-// TODO: Prompt user if the want to replace a password or not
-
+/**
+ * @author Kavin Muthuselvan, Matthew Stall
+ */ 
 public class App {
     private static final String KEY_GEN_ALGORITHM = "PBKDF2WithHmacSHA256";
     private static final int PBKDF2_ITERATIONS = 1024;
@@ -35,13 +35,13 @@ public class App {
 
             String saltString = generateRandomSaltString();
 
-            String hashString = getPrivateKeyHashed(newPasscodeString, saltString);
+            String hashString = hashPrivateKey(newPasscodeString, saltString);
             String outputString = saltString + ":" + hashString + "\n";
 
             if (writeToFile(keyFile, outputString, false))
                 System.out.println("Passcode creation success!\n");
             else {
-                System.out.println("Passcode creation failed.\n");
+                System.out.println("Passcode creation failed. Please try again.\n");
                 System.exit(1);
             }
         }
@@ -56,6 +56,8 @@ public class App {
             return;
         }
 
+        System.out.print("Keyfile detected.");
+
         //  AUTHENTICATION
 
         keyFileScan.useDelimiter(":");
@@ -69,7 +71,7 @@ public class App {
             storedPrivateKeyHash = storedPrivateKeyHash.substring(1);
         }
 
-        while (!getPrivateKeyHashed(passcodeString, saltString).equals(storedPrivateKeyHash)) {
+        while (!hashPrivateKey(passcodeString, saltString).equals(storedPrivateKeyHash)) {
             System.out.println("Incorrect Passcode");
             System.out.print("Enter your passcode to access Password Manager: ");
             passcodeString = cin.nextLine();
@@ -83,7 +85,6 @@ public class App {
             keyFileScan.close();
             try {
                 keyFileScan = new Scanner(keyFile);
-                keyFileScan.nextLine();
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
                 cin.close();
@@ -92,12 +93,13 @@ public class App {
             keyFileScan.nextLine();
 
             System.out.println("\nWelcome to Password Manager");
-            System.out.print("\na: Add Password\nb: Read Password\nq: Quit\nEnter choice: ");
+            System.out.print("\na: Add Password\nr: Read Password\nq: Quit\nEnter choice: ");
             String choice = cin.nextLine();
 
             switch (choice) {
                 case "q": {
                     running = false;
+                    System.out.println("Exiting Password Manager...");
                     break;
                 }
                 case "a": {
@@ -138,12 +140,13 @@ public class App {
 
                     break;
                 }
-                case "b": {
+                case "r": {
                     System.out.print("Enter label for password: ");
                     String label = cin.nextLine();
 
                     String targetPassword = "";
                     
+                    // Search for this label in the keyfile
                     boolean existing = false;
                     keyFileScan.useDelimiter(":");
                     while (!existing && keyFileScan.hasNextLine()) {
@@ -166,8 +169,13 @@ public class App {
 
         keyFileScan.close();
         cin.close();
+        System.exit(0);
     }
 
+    /**
+     * Returns a base64 encoded randomly generated salt string
+     * @return A Base 64 encoded randomly generated salt string
+     */
     private static String generateRandomSaltString() {
         SecureRandom random = new SecureRandom();
         byte[] salt = new byte[16];
@@ -176,6 +184,13 @@ public class App {
         return Base64.getEncoder().encodeToString(salt);
     }
 
+    /**
+     * Decrypts an encrypted string
+     * @param message The encrypted message
+     * @param passcode The passcode portion of the symmetric encryption key
+     * @param saltString The salt portion of the symmetric encryption key
+     * @return The decrypted message
+     */
     private static String decryptMessage(String message, String passcode, String saltString) {
         try {
             byte[] salt = Base64.getDecoder().decode(saltString);
@@ -194,7 +209,9 @@ public class App {
             cipher.init(Cipher.DECRYPT_MODE, keySpec, new IvParameterSpec(iv));
 
             byte[] decryptedData = cipher.doFinal(actualCiphertext);
+
             return new String(decryptedData);
+
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(1);
@@ -202,6 +219,12 @@ public class App {
         }
     }
 
+    /**
+     * Replace line starting with specified label with a new password
+     * @param label Label to match with the line to be overwritten
+     * @param password New password
+     * @param file File to access and replace password in
+     */
     private static void replacePassword(String label, String password, File file) {
         String[] labelPassPair = new String[1];
         Scanner keyFileScan = null;
@@ -228,7 +251,13 @@ public class App {
         writeToFile(file, builder.toString(), false);
     }
 
-
+    /**
+     * Encrypts a string
+     * @param message String to encrypt
+     * @param passcode The passcode portion of the symmetric encryption key
+     * @param saltString The salt portion of the symmetric encryption key
+     * @return Resulting encrypted version of the string
+     */
     private static String encryptMessage(String message, String passcode, String saltString) {
         try {
             byte[] salt = Base64.getDecoder().decode(saltString);
@@ -259,8 +288,13 @@ public class App {
         }
     }
 
-
-    private static String getPrivateKeyHashed(String passcode, String saltString) {
+    /**
+     * Generates a hashed and salted private key
+     * @param passcode String to convert to a hash
+     * @param saltString Salt to add to the hash
+     * @return Resulting hashed string
+     */
+    private static String hashPrivateKey(String passcode, String saltString) {
     
         byte[] salt = Base64.getDecoder().decode(saltString);
 
@@ -286,6 +320,13 @@ public class App {
         return hashString;
     }
 
+    /**
+     * Writes to a specified file
+     * @param file File to write output string to
+     * @param output String to write
+     * @param append If true, appends string at end of file. If false, overwrites starting with the beginning of the file
+     * @return Returns true if the file process was successful
+     */
     private static boolean writeToFile(File file, String output, boolean append) {
         try {
             if (!file.exists())
