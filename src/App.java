@@ -85,18 +85,21 @@ public class App {
                 keyFileScan = new Scanner(keyFile);
                 keyFileScan.nextLine();
             } catch (FileNotFoundException e) {
-                throw new RuntimeException(e);
+                e.printStackTrace();
+                cin.close();
+                System.exit(1);
             }
 
+            System.out.println("\nWelcome to Password Manager");
             System.out.print("\na: Add Password\nb: Read Password\nq: Quit\nEnter choice: ");
             String choice = cin.nextLine();
 
             switch (choice) {
-                case "q" -> {
+                case "q": {
                     running = false;
+                    break;
                 }
-                case "a" -> {
-
+                case "a": {
                     System.out.print("Enter label for password: ");
                     String label = cin.nextLine();
                     System.out.print("Enter password to store: ");
@@ -111,8 +114,9 @@ public class App {
                     } else {
                         replacePassword(label, encryptedPasscodeString, keyFile);
                     }
+                    break;
                 }
-                case "b" -> {
+                case "b": {
                     keyFileScan.useDelimiter("\n");
                     System.out.print("Enter label for password: ");
                     String label = cin.nextLine();
@@ -129,7 +133,9 @@ public class App {
                     if (found)
                         System.out.println("The stored password is: " + decryptMessage(labelPassPair[1], passcodeString, saltString));
                     else
-                        System.out.println("No password matches this label!");
+                        System.out.println("No password matches label \"" + label + "\"");
+
+                    break;
                 }
             }
         }
@@ -239,7 +245,7 @@ public class App {
         SecretKeyFactory factory;
         SecretKey privateKey;
 
-        try { // TODO: better error handling
+        try {
             factory = SecretKeyFactory.getInstance(KEY_GEN_ALGORITHM);
             privateKey = factory.generateSecret(spec);
 
